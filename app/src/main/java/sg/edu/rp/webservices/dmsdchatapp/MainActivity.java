@@ -6,14 +6,17 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.view.ContextMenu;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -28,6 +31,10 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.w3c.dom.Text;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -37,7 +44,7 @@ public class MainActivity extends AppCompatActivity {
  FirebaseUser fbUser;
  FirebaseDatabase firebaseDatabase;
     private DatabaseReference messageListRef, nameRef;
-
+TextView tvWeather;
     EditText etMessage;
 Button btnSend;
     String msguser;
@@ -59,13 +66,20 @@ Button btnSend;
         etMessage = (EditText) findViewById(R.id.etName);
         btnSend = (Button) findViewById(R.id.btnSend);
         lv = (ListView) findViewById(R.id.listView);
-
+tvWeather = (TextView) findViewById(R.id.textViewWeather);
         alMessage = new ArrayList<ChatMessage>();
         aaMessage = new MessageAdapter(getBaseContext(), alMessage);
         lv.setAdapter(aaMessage);
         nameRef = firebaseDatabase.getReference("profiles/" + uid);
         messageListRef = firebaseDatabase.getReference("messages/");
+        registerForContextMenu(lv);
 
+        HttpRequest request = new HttpRequest
+                ("https://api.data.gov.sg/v1/environment/2-hour-weather-forecast");
+request.setAPIKey("USgDjj3BSjvuIANTX4LDvacxs5BG39Jx", "USgDjj3BSjvuIANTX4LDvacxs5BG39Jx");
+        request.setOnHttpResponseListener(mHttpResponseListener);
+        request.setMethod("GET");
+        request.execute();
         nameRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -158,6 +172,40 @@ Button btnSend;
 
     }
 
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v,
+                                    ContextMenu.ContextMenuInfo menuInfo) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.deletemenu, menu);
+    }
+
+
+
+    public boolean onContextItemSelected(MenuItem item) {
+
+        AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+        int index = info.position;
+        String msguser1 = alMessage.get(index).getMessageUser();
+        Toast.makeText(MainActivity.this, "msg sender: " + msguser + "/ncurrent user: " + msguser1, Toast.LENGTH_LONG).show();
+        int id = item.getItemId();
+        if (msguser1.equals(msguser)) {
+            if (id == R.id.menu_delete) {
+
+
+                messageListRef.child(alMessage.get(index).getId()).removeValue();
+            }
+            return true;
+
+
+        } else if (!msguser1.equals(msguser)) {
+            Toast.makeText(MainActivity.this, "You cannot delete other user's msg!", Toast.LENGTH_LONG).show();
+        }
+
+
+
+
+        return super.onContextItemSelected(item);
+    }
 
 
     @Override
@@ -194,5 +242,29 @@ Button btnSend;
     private void logout(){
         fbAuth.signOut();
     }
-}
 
+
+    // Code for step 2 start
+    private HttpRequest.OnHttpResponseListener mHttpResponseListener =
+            new HttpRequest.OnHttpResponseListener() {
+                @Override
+                public void onResponse(String response) {
+
+                    // process response here
+                    try {
+                        JSONObject jsonObject = new JSONObject(response);
+                        JSONObject woodlandsObj = (JSONObject) jsonObject.getJSONArray("items").getJSONObject(0).getJSONArray("forecasts").get(45);
+                        String weather = (String) woodlandsObj.get("forecast");
+tvWeather.setText("Weather Forecast @ Woodlands " + weather);
+
+
+
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                }
+            };
+
+}
